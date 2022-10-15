@@ -19,10 +19,9 @@ void Demo::Init() {
 
 	BuildColoredCube();
 
-
-
 	BuildColoredPlane();
-	//wayPoint = GenerateBezier();
+
+	wayPoints = GenerateBezier(10000);
 }
 
 void Demo::DeInit() {
@@ -38,18 +37,23 @@ void Demo::DeInit() {
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void Demo::ProcessInput(GLFWwindow *window) {
+void Demo::ProcessInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
-
-
-
 }
 
 void Demo::Update(double deltaTime) {
-	angle += (float) ((deltaTime * 1.5f) / 1000);
-	pos += (float) ((deltaTime * 1.5f) / 1000);
+	angle += (float)((deltaTime * 5.5f) / 1000);
+	//post += (float) ((deltaTime * 1.5f) / 1000);
+
+	nextPost = glm::vec3(wayPoints[wayPointIndex][0], 0, wayPoints[wayPointIndex][1]);
+	currentPost = currentPost + (float)(deltaTime * deltaTime * 1.5f) * (nextPost - currentPost);
+	//view_angle = findAngle((currentPost-beforeCurrentPost),(nextPost - currentPost));
+
+	if (wayPointIndex < 9999) {
+		wayPointIndex++;
+	}
 }
 
 void Demo::Render() {
@@ -72,18 +76,16 @@ void Demo::Render() {
 	GLint viewLoc = glGetUniformLocation(this->shaderProgram, "view");
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-	// DrawColoredCube(translate, rotate, scale,rot angle)
-
 	// Propeller
-	DrawColoredCube(glm::vec3(-2, 7, 0), glm::vec3(0, 1, 0), glm::vec3(1, 1, 7), 0,true);
-	DrawColoredCube(glm::vec3(5, 3, 0), glm::vec3(1, 0, 0), glm::vec3(1, 1, 3), 0,true);
+	DrawColoredCube(glm::vec3(-2, 7, 0), glm::vec3(0, 1, 0), glm::vec3(1, 1, 7), 90, true);
+	DrawColoredCube(glm::vec3(5, 2, 0), glm::vec3(1, 0, 0), glm::vec3(1, 1, 3), 0, true);
 
 	// Main Body
-	DrawColoredCube(glm::vec3(-2, 3, 0), glm::vec3(1, 0, 0), glm::vec3(4, 4, 4), 0,false);
+	DrawColoredCube(glm::vec3(-2, 3, 0), glm::vec3(1, 0, 0), glm::vec3(4, 4, 4), 0, false);
 
 	// Connector
-	DrawColoredCube(glm::vec3(-2, 6, 0), glm::vec3(1, 0, 0), glm::vec3(1, 1, 1), 0,false);
-	DrawColoredCube(glm::vec3(2, 3, 0), glm::vec3(0, 1, 0), glm::vec3(5, 1, 1), 0,false);
+	DrawColoredCube(glm::vec3(-2, 6, 0), glm::vec3(1, 0, 0), glm::vec3(1, 1, 1), 0, false);
+	DrawColoredCube(glm::vec3(2, 3, 0), glm::vec3(0, 1, 0), glm::vec3(6, 1, 1), 0, false);
 
 
 	DrawColoredPlane();
@@ -197,25 +199,23 @@ void Demo::DrawColoredCube(glm::vec3 translate_vector, glm::vec3 rotate_vector, 
 
 	glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 
-	translate_vector.x -= pos;
-	//translate_vector.x = wayPoint[i][0];
-	//translate_vector.z = wayPoint[i][1];
-	//i+=0.01;
-	//if (i > 10) {
-	//	i = 0;
-	//}
+	//translate_vector.x -= post;
+	//translate_vector.y -= post;
 
 	glm::mat4 model;
-	// model = glm::translate(model, glm::vec3(0, 2, 0));
+
+	model = glm::rotate(model, view_angle, glm::vec3(0, 1, 0));
+	translate_vector.x += currentPost.x;
+	translate_vector.z += currentPost.z;
+
+	// -------------- translate, rotate, scale per bagian --------------------
 	model = glm::translate(model, translate_vector);
 	if (rotate) {
-
-	model = glm::rotate(model, angle, rotate_vector);
+		model = glm::rotate(model, angle, rotate_vector);
 	}
 	// model = glm::rotate(model, angle, rotate_vector);
 
 	model = glm::scale(model, scale_vector);
-	// model = glm::scale(model, scale_vector);
 
 	GLint modelLoc = glGetUniformLocation(this->shaderProgram, "model");
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -279,8 +279,6 @@ void Demo::BuildColoredPlane()
 	glBindVertexArray(0); // Unbind VAO
 }
 
-
-
 void Demo::DrawColoredPlane()
 {
 	glUseProgram(shaderProgram);
@@ -300,28 +298,31 @@ void Demo::DrawColoredPlane()
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
 }
-float** Demo::GenerateBezier() {
-	const int segmentCount = 10;
-	glm::vec3 p0 = glm::vec3(0, 0, 0);
-	glm::vec3 p1 = glm::vec3(11, 0, -3);
-	glm::vec3 p2=glm::vec3(10,  0, -10);
-	//float arrx[segmentCount];
-	//float arrz[segmentCount];
-	float** wayPoint =new float*[segmentCount];
-	
-	for (int i = 0; i < segmentCount; i++) {
-		float t = (float)i / segmentCount;
-		float x = ((1 - t) * (1 - t) * p0.x) + (2 * (1 - t) * t * p1.x) + (t * t * p2.x);
-		float z = ((1 - t) * (1 - t) * p0.z) + (2 * (1 - t) * t * p1.z) + (t * t * p2.z);
-		wayPoint[i][0] = x;
-		wayPoint[i][1] = z;
-		
 
+float** Demo::GenerateBezier(int segmentCount) {
+	glm::vec3 P0;
+	glm::vec3 P1;
+	glm::vec3 P2;
+	P0 = { 0, 0, 0 };
+	P1 = { -10, 0, -7 };
+	P2 = { 0, 0, -30 };
+	float** wayPoint = new float* [segmentCount];
+
+	for (int i = 0; i < segmentCount; i++) {
+		wayPoint[i] = new float[2];
+		double t = GetDeltaTime();
+		t = (float)i / segmentCount;
+		wayPoint[i][0] = ((1 - t) * (1 - t) * P0.x) + (2 * (1 - t) * t * P1.x) + (t * t * P2.x);
+		wayPoint[i][1] = ((1 - t) * (1 - t) * P0.z) + (2 * (1 - t) * t * P1.z) + (t * t * P2.z);
 	}
+
 	return wayPoint;
-	
+}
+float Demo::findAngle(glm::vec3 a0, glm::vec3 a1) {
+	//return ((a0.x*a1.x)+ (a0.y * a1.y)+(a0.z * a1.z))/(glm::length(a0)*glm::length(a1));
+	return glm::dot(a0, a1) / (glm::length(a0) * glm::length(a1));
 }
 int main(int argc, char** argv) {
-	RenderEngine &app = Demo();
+	RenderEngine& app = Demo();
 	app.Start("Transformation: Transform Cube", 800, 600, false, false);
 }
